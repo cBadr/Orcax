@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.next/
+.turbo/
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.log
+logs/
+.DS_Store
+coverage/
+tmp/
+uploads/
+exports/
+data/
+prisma/migrations/dev.db*

@@ -1,0 +1,28 @@
+{
+  "name": "platform",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.6.2",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter=./apps/* dev",
+    "dev:all": "concurrently -n api,workers,web -c cyan,magenta,green \"pnpm dev:api\" \"pnpm dev:workers\" \"pnpm dev:web\"",
+    "dev:api": "pnpm --filter=@platform/api dev",
+    "dev:workers": "pnpm --filter=@platform/api dev:workers",
+    "dev:web": "pnpm --filter=@platform/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "db:migrate": "pnpm --filter=@platform/api db:migrate",
+    "db:seed": "pnpm --filter=@platform/api db:seed",
+    "db:studio": "pnpm --filter=@platform/api db:studio"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "prettier": "^3.3.3",
+    "@types/node": "^20.14.11",
+    "concurrently": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,520 @@
+// Prisma schema for the platform.
+// Note: PostgreSQL-specific features (partitioning, GIN indexes on jsonb) are
+// applied via raw SQL migrations after the base migrate step. See prisma/sql/*.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===================== Auth / Users =====================
+
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  emailNormalized      String    @unique
+  passwordHash         String?
+  googleId             String?   @unique
+  country              String    @db.Char(2)
+  telegram             String?
+  status               String    @default("active") // active | suspended | banned | pending_verification
+  emailVerifiedAt      DateTime?
+  twoFaSecret          String?
+  twoFaEnabled         Boolean   @default(false)
+  balancePoints        BigInt    @default(0)
+  frozenBalancePoints  BigInt    @default(0)
+  roleId               Int
+  resellerTierId       Int?
+  referralCode         String    @unique
+  referredById         String?
+  lastLoginAt          DateTime?
+  lastLoginIp          String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  role          Role            @relation(fields: [roleId], references: [id])
+  resellerTier  ResellerTier?   @relation(fields: [resellerTierId], references: [id])
+  referredBy    User?           @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]          @relation("Referrals")
+
+  sessions         Session[]
+  refreshTokens    RefreshToken[]
+  emailTokens      EmailToken[]
+  searches         Search[]
+  reservations     Reservation[]
+  orders           Order[]
+  payments         Payment[]
+  ledgerEntries    LedgerEntry[]
+  tickets          Ticket[]
+  ticketMessages   TicketMessage[]
+  exports          ExportJob[]
+  notifications    Notification[]
+  auditLogs        AuditLog[]
+  referralEarnings ReferralEarning[] @relation("ReferralEarningReferrer")
+  referralsFrom    ReferralEarning[] @relation("ReferralEarningReferred")
+  loginAttempts    LoginAttempt[]
+
+  @@index([status])
+  @@index([roleId])
+  @@index([createdAt])
+}
+
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique
+  displayName String
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          Int              @id @default(autoincrement())
+  key         String           @unique
+  description String?
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  ip         String?
+  userAgent  String?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EmailToken {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // verify_email | password_reset
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+model LoginAttempt {
+  id         BigInt   @id @default(autoincrement())
+  userId     String?
+  email      String
+  ip         String?
+  success    Boolean
+  attemptedAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email, attemptedAt])
+  @@index([ip, attemptedAt])
+}
+
+// ===================== Domains / Countries / Emails =====================
+
+model Country {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.Char(2)
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  domains Domain[]
+}
+
+model Domain {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  tld         String
+  countryId   Int?
+  isActive    Boolean  @default(true)
+  emailsCount BigInt   @default(0)
+  createdAt   DateTime @default(now())
+
+  country       Country?        @relation(fields: [countryId], references: [id])
+  emails        Email[]
+  pricing       PricingDomain?
+  emailFiles    EmailFile[]
+
+  @@index([tld])
+  @@index([countryId])
+}
+
+model EmailFolder {
+  id            Int      @id @default(autoincrement())
+  path          String   @unique
+  label         String?
+  status        String   @default("idle") // idle | scanning | processing | error
+  filesCount    Int      @default(0)
+  emailsCount   BigInt   @default(0)
+  lastScannedAt DateTime?
+  createdAt     DateTime @default(now())
+
+  files EmailFile[]
+}
+
+model EmailFile {
+  id               Int       @id @default(autoincrement())
+  folderId         Int
+  domainId         Int?
+  filename         String
+  fullPath         String
+  linesCount       Int       @default(0)
+  ingestedCount    Int       @default(0)
+  duplicatesCount  Int       @default(0)
+  invalidCount     Int       @default(0)
+  status           String    @default("pending") // pending | processing | done | error
+  errorMessage     String?
+  processedAt      DateTime?
+  createdAt        DateTime  @default(now())
+
+  folder EmailFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  domain Domain?     @relation(fields: [domainId], references: [id])
+
+  @@unique([folderId, filename])
+  @@index([status])
+}
+
+// Logical model for Email. In a PostgreSQL migration we convert it to a
+// list-partitioned table by partition_key (= abs(hashtext(domain)) % 32).
+model Email {
+  id             BigInt    @id @default(autoincrement())
+  email          String
+  localPart      String
+  domainId       Int
+  hash           String    @unique // sha256 of lowercased email
+  partitionKey   Int // hash bucket (0..31)
+  status         String    @default("available") // available | reserved | sold
+  reservedUntil  DateTime?
+  reservedById   String?
+  soldAt         DateTime?
+  availableAfter DateTime? // cooldown gate
+  sourceFileId   Int?
+  createdAt      DateTime  @default(now())
+
+  domain Domain @relation(fields: [domainId], references: [id])
+
+  @@index([domainId, status, availableAfter])
+  @@index([status, reservedUntil])
+  @@index([partitionKey, domainId])
+}
+
+// ===================== Pricing =====================
+
+model PricingDefault {
+  id             Int @id @default(autoincrement())
+  pointsPerEmail Int
+  updatedAt      DateTime @updatedAt
+}
+
+model PricingTldGroup {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  tlds           String[] // e.g., ['edu', 'ac.uk']
+  pointsPerEmail Int
+  priority       Int      @default(100)
+  createdAt      DateTime @default(now())
+}
+
+model PricingDomain {
+  id             Int      @id @default(autoincrement())
+  domainId       Int      @unique
+  pointsPerEmail Int
+  createdAt      DateTime @default(now())
+
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+}
+
+model BulkDiscount {
+  id          Int     @id @default(autoincrement())
+  minQuantity Int
+  discountPct Float
+  active      Boolean @default(true)
+}
+
+model TopupBonus {
+  id       Int     @id @default(autoincrement())
+  minUsd   Float
+  bonusPct Float
+  active   Boolean @default(true)
+}
+
+// ===================== Searches / Reservations / Orders =====================
+
+model Search {
+  id         String   @id @default(cuid())
+  userId     String
+  filters    Json
+  totalFound Int
+  createdAt  DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@index([userId, createdAt])
+}
+
+model Reservation {
+  id             String    @id @default(cuid())
+  userId         String
+  searchId       String?
+  status         String    @default("active") // active | confirmed | expired | canceled
+  expiresAt      DateTime
+  totalCount     Int       @default(0)
+  totalPoints    BigInt    @default(0)
+  confirmedAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  search Search? @relation(fields: [searchId], references: [id], onDelete: SetNull)
+  items  ReservationItem[]
+  order  Order?
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+model ReservationItem {
+  id            BigInt @id @default(autoincrement())
+  reservationId String
+  emailId       BigInt
+  domainId      Int
+  pointsCost    Int
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+
+  @@index([reservationId])
+  @@index([emailId])
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  reservationId String   @unique
+  totalCount    Int
+  totalPoints   BigInt
+  status        String   @default("completed") // completed | refunded
+  createdAt     DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+  reservation Reservation @relation(fields: [reservationId], references: [id])
+  exports     ExportJob[]
+
+  @@index([userId, createdAt])
+}
+
+// ===================== Payments / Ledger =====================
+
+model Payment {
+  id              String    @id @default(cuid())
+  userId          String
+  provider        String    @default("coinpayments")
+  providerId      String?   @unique
+  amountUsd       Decimal   @db.Decimal(18, 8)
+  amountPoints    BigInt
+  currency        String
+  status          String    @default("pending") // pending | confirmed | failed | canceled
+  txid            String?
+  ipnPayload      Json?
+  confirmedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model LedgerEntry {
+  id           BigInt   @id @default(autoincrement())
+  userId       String
+  amount       BigInt // signed, in points
+  type         String // topup | purchase | refund | referral | bonus | admin_adjust | reseller_discount
+  referenceId  String?
+  balanceAfter BigInt
+  note         String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+// ===================== Resellers / Referrals =====================
+
+model ResellerTier {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  discountPct Float // applied on top-up value
+  description String?
+  createdAt   DateTime @default(now())
+
+  users User[]
+}
+
+model ReferralEarning {
+  id          BigInt   @id @default(autoincrement())
+  referrerId  String
+  referredId  String
+  paymentId   String?
+  earnedPoints BigInt
+  createdAt   DateTime @default(now())
+
+  referrer User @relation("ReferralEarningReferrer", fields: [referrerId], references: [id])
+  referred User @relation("ReferralEarningReferred", fields: [referredId], references: [id])
+
+  @@index([referrerId])
+}
+
+// ===================== Exports / GoFile =====================
+
+model ExportJob {
+  id            String    @id @default(cuid())
+  userId        String
+  orderId       String?
+  format        String // txt | csv
+  status        String    @default("queued") // queued | running | done | error
+  totalCount    Int
+  filePath      String?
+  fileSizeBytes BigInt?
+  goFileUrl     String?
+  goFileCode    String?
+  expiresAt     DateTime? // local file retention
+  errorMessage  String?
+  createdAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+// ===================== Support / Notifications =====================
+
+model Ticket {
+  id        String   @id @default(cuid())
+  userId    String
+  subject   String
+  status    String   @default("open") // open | answered | closed
+  priority  String   @default("normal") // low | normal | high
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TicketMessage {
+  id         BigInt   @id @default(autoincrement())
+  ticketId   String
+  authorId   String
+  authorType String // user | staff
+  body       String
+  createdAt  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+
+  @@index([ticketId])
+}
+
+model Notification {
+  id        BigInt    @id @default(autoincrement())
+  userId    String
+  type      String
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model EmailTemplate {
+  key       String   @id
+  subject   String
+  htmlBody  String
+  updatedAt DateTime @updatedAt
+}
+
+// ===================== Admin / System =====================
+
+model AuditLog {
+  id         BigInt   @id @default(autoincrement())
+  actorId    String?
+  action     String
+  targetType String?
+  targetId   String?
+  diff       Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+}
+
+model Announcement {
+  id        Int       @id @default(autoincrement())
+  title     String
+  body      String
+  type      String    @default("info") // info | warning | success
+  active    Boolean   @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

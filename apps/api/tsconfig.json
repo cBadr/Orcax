@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["*"],
+      "@platform/shared": ["../../../packages/shared/src/index.ts"],
+      "@platform/shared/*": ["../../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src/**/*"]
+}
