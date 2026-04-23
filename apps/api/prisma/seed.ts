@@ -182,7 +182,7 @@ const EMAIL_TEMPLATES: Array<{ key: string; subject: string; htmlBody: string }>
     key: 'payment_confirmed',
     subject: '{{site_name}}: Payment confirmed',
     htmlBody: `<h2 style="color:#d4af37">Payment confirmed</h2>
-<p>Your top-up of <b>${{amountUsd}}</b> has been credited. You received <b>{{points}}</b> points.</p>
+<p>Your top-up of <b>\${{amountUsd}}</b> has been credited. You received <b>{{points}}</b> points.</p>
 <p>New balance: <b>{{balance}}</b> points.</p>`,
   },
   {
