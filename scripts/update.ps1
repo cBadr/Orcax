@@ -1,6 +1,7 @@
 # ==============================================================================
 # Pull latest code + migrate + rebuild + restart (idempotent).
-# Run after each deploy on the server.
+# Run after each deploy on the server:
+#   powershell -ExecutionPolicy Bypass -File scripts\update.ps1
 # ==============================================================================
 
 $ErrorActionPreference = 'Stop'

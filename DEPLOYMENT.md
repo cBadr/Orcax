@@ -78,7 +78,7 @@ Open both files and fill in real values. Essentials:
 ## 4. One-shot deploy
 
 ```powershell
-pwsh -File scripts\deploy.ps1
+powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 ```
 
 This runs, in order:
@@ -163,7 +163,7 @@ Then visit:
 ## 7. Updates
 
 ```powershell
-pwsh -File scripts\update.ps1
+powershell -ExecutionPolicy Bypass -File scripts\update.ps1
 ```
 
 What it does:

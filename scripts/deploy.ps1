@@ -1,7 +1,7 @@
 # ==============================================================================
 # First-time production deploy on Windows.
-# Run from project root:
-#   pwsh -File scripts/deploy.ps1
+# Run from project root (works with Windows PowerShell 5.1 or PowerShell 7+):
+#   powershell -ExecutionPolicy Bypass -File scripts\deploy.ps1
 # Pre-requisites:
 #   - Node 20+, pnpm, PostgreSQL, Memurai (Redis), pm2, pm2-windows-startup
 #   - apps/api/.env and apps/web/.env filled in (see .env.production.example)

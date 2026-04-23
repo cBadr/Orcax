@@ -2,16 +2,26 @@ node_modules/
 dist/
 .next/
 .turbo/
+
+# env files (keep the *.production.example templates)
 .env
 .env.*
 !.env.example
 !.env.production.example
+
+# logs
 *.log
 logs/
+
+# os
 .DS_Store
+Thumbs.db
+
+# tests
 coverage/
-tmp/
-uploads/
-exports/
-data/
-prisma/migrations/dev.db*
+
+# ONLY the runtime data directories — NOT source-code folders named uploads/ or exports/
+/data/
+/tmp/
+apps/api/data/
+apps/api/tmp/
