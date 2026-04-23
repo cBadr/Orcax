@@ -44,7 +44,7 @@ export async function enqueueFolderScan(folderId: number) {
   return getQueue(QUEUES.INGESTION).add(
     'scan_folder',
     { type: 'scan_folder', folderId } satisfies IngestionScanJob,
-    { jobId: `scan:${folderId}` },
+    { jobId: `scan-${folderId}` },
   );
 }
 
@@ -52,7 +52,7 @@ export async function enqueueFileProcess(fileId: number) {
   return getQueue(QUEUES.INGESTION).add(
     'process_file',
     { type: 'process_file', fileId } satisfies IngestionFileJob,
-    { jobId: `file:${fileId}` },
+    { jobId: `file-${fileId}` },
   );
 }
 
@@ -64,6 +64,6 @@ export async function enqueueExport(exportId: string) {
   return getQueue(QUEUES.EXPORT).add(
     'run_export',
     { exportId } satisfies ExportJobInput,
-    { jobId: `export:${exportId}` },
+    { jobId: `export-${exportId}` },
   );
 }
